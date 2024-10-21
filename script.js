@@ -1,10 +1,35 @@
 function filterData() {
   event.preventDefault();
+
+  // Get the start and end dates from the input fields
   var startdate = document.getElementById("startdate").value;
   var enddate = document.getElementById("enddate").value;
-  console.log(startdate);
-  console.log(enddate);
+
+  // Parse the dates into Date objects for comparison
+  var startDateObj = new Date(startdate);
+  var endDateObj = new Date(enddate);
+
+  // Log the dates for debugging purposes
+  console.log("Start Date:", startdate);
+  console.log("End Date:", enddate);
+
+  // Get all rows of the table body (skip the header row)
+  var rows = document.querySelectorAll("#pitch-data tr");
+
+  // Loop through each row and hide/show based on the date
+  rows.forEach(row => {
+    var dateText = row.cells[1].textContent;  // Assuming Date is in the second column (index 1)
+    var rowDateObj = new Date(dateText);
+
+    // Check if the row date is within the range
+    if (rowDateObj >= startDateObj && rowDateObj <= endDateObj) {
+      row.style.display = "";  // Show row if it's in range
+    } else {
+      row.style.display = "none";  // Hide row if it's out of range
+    }
+  });
 }
+
 
 document.addEventListener('DOMContentLoaded', function() {
   const tableBody = document.getElementById('pitch-data');
