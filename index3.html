@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pitch Stats</title>
+  <style>
+    .blue {
+      color: #0C2340;
+    }
+    .red {
+      color: #BD1F2D;
+    }
+    th {
+      border-bottom: 1px solid gray;
+      cursor: pointer;
+    }
+    td {
+      text-align: center;
+    }
+    td.left {
+      text-align: left;
+    }
+    a {
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .sorted-asc::after {
+      content: ' ▲';
+    }
+    .sorted-desc::after {
+      content: ' ▼';
+    }
+    .stats {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <a href="answers.html">My Answers</a>
+  <h1 class="red">Trackman Pitch Stats Viewer</h1>
+  <form onsubmit="filterData(); return false;">
+    <label>Starting Date</label>
+    <input type="date" id="startdate" />
+    <label>Ending Date</label>
+    <input type="date" id="enddate" />
+    <button>Filter</button>
+  </form>
+  <table class="blue">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">PitchNo</th>
+        <th onclick="sortTable(1)">Date</th>
+        <th onclick="sortTable(2)">Time</th>
+        <th onclick="sortTable(3)">Batter</th>
+        <th onclick="sortTable(4)">Balls</th>
+        <th onclick="sortTable(5)">Strikes</th>
+        <th onclick="sortTable(6)">Outs</th>
+        <th onclick="sortTable(7)">PitchCall</th>
+        <th onclick="sortTable(8)">KorBB</th>
+        <th onclick="sortTable(9)">RelSpeed</th>
+        <th onclick="sortTable(10)">SpinRate</th>
+        <th onclick="sortTable(11)">SpinAxis</th>
+      </tr>
+    </thead>
+    <tbody id="pitch-data">
+      <!-- Rows will be populated here by JavaScript -->
+    </tbody>
+  </table>
+
+  <div id="stats" class="stats"></div>
+
+  <script>
+    let pitchData = [];  // Store fetched data here for calculations
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const tableBody = document.getElementById('pitch-data');
+
+      fetch('https://compute.samford.edu/zohauth/clients/datajson/1')
+        .then(response => response.json())
+        .then(data => {
+          pitchData = data;  // Save the data for calculations
+          data.forEach(pitch => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td><a href="details.html?id=${pitch.PitchNo}">Pitch ${pitch.PitchNo}</a></td>
+              <td>${pitch.Date}</td>
+              <td>${pitch.Time}</td>
+              <td>${pitch.Batter}</td>
+              <td>${pitch.Balls}</td>
+              <td>${pitch.Strikes}</td>
+              <td>${pitch.Outs}</td>
+              <td>${pitch.PitchCall}</td>
+              <td>${pitch.KorBB || ''}</td>
+              <td>${pitch.RelSpeed || ''}</td>
+              <td>${pitch.SpinRate || ''}</td>
+              <td>${pitch.SpinAxis || ''}</td>
+            `;
+            tableBody.appendChild(row);
+          });
+
+          calculateStats();
+        })
+        .catch(error => {
+          console.error('Error fetching data:', error);
+        });
+    });
+
+    function filterData() {
+      const startdate = document.getElementById('startdate').value;
+      const enddate = document.getElementById('enddate').value;
+      const startDateObj = new Date(startdate);
+      const endDateObj = new Date(enddate);
+
+      const rows = document.querySelectorAll('#pitch-data tr');
+      rows.forEach(row => {
+        const dateText = row.cells[1].textContent;
+        const rowDateObj = new Date(dateText);
+        row.style.display = (rowDateObj >= startDateObj && rowDateObj <= endDateObj) ? '' : 'none';
+      });
+    }
+
+    function sortTable(columnIndex) {
+      const table = document.querySelector("table tbody");
+      const rows = Array.from(table.rows);
+      const compare = (a, b) => {
+        const cellA = a.cells[columnIndex].textContent.trim();
+        const cellB = b.cells[columnIndex].textContent.trim();
+        const numA = parseFloat(cellA) || cellA;
+        const numB = parseFloat(cellB) || cellB;
+        return (numA < numB ? -1 : numA > numB ? 1 : 0) * (isAscending ? 1 : -1);
+      };
+
+      document.querySelectorAll('th').forEach(th => th.classList.remove('sorted-asc', 'sorted-desc'));
+
+      if (currentSortColumn === columnIndex) {
+        isAscending = !isAscending;
+      } else {
+        isAscending = true;
+      }
+
+      rows.sort(compare);
+      rows.forEach(row => table.appendChild(row));
+
+      const header = document.querySelectorAll('th')[columnIndex];
+      header.classList.add(isAscending ? 'sorted-asc' : 'sorted-desc');
+
+      currentSortColumn = columnIndex;
+    }
+
+    function calculateStats() {
+      const columns = ['RelSpeed', 'SpinRate', 'SpinAxis'];  // Columns to calculate stats for
+      const statsDiv = document.getElementById('stats');
+      let statsHTML = '<h2>Pitch Stats Summary</h2>';
+
+      columns.forEach(column => {
+        const values = pitchData.map(pitch => parseFloat(pitch[column])).filter(val => !isNaN(val));
+
+        if (values.length > 0) {
+          const mean = calculateMean(values);
+          const median = calculateMedian(values);
+          const mode = calculateMode(values);
+
+          statsHTML += `
+            <p><strong>${column}:</strong><br>
+            Mean: ${mean.toFixed(2)}, Median: ${median.toFixed(2)}, Mode: ${mode !== null ? mode : 'No mode'}</p>
+          `;
+        }
+      });
+
+      statsDiv.innerHTML = statsHTML;
+    }
+
+    function calculateMean(values) {
+      const sum = values.reduce((acc, val) => acc + val, 0);
+      return sum / values.length;
+    }
+
+    function calculateMedian(values) {
+      values.sort((a, b) => a - b);
+      const mid = Math.floor(values.length / 2);
+      return values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid];
+    }
+
+    function calculateMode(values) {
+      const frequency = {};
+      values.forEach(val => frequency[val] = (frequency[val] || 0) + 1);
+
+      let maxFreq = 0;
+      let mode = null;
+      for (const val in frequency) {
+        if (frequency[val] > maxFreq) {
+          maxFreq = frequency[val];
+          mode = parseFloat(val);
+        } else if (frequency[val] === maxFreq) {
+          mode = null;  // No single mode
+        }
+      }
+
+      return mode;
+    }
+  </script>
+</body>
+</html>
